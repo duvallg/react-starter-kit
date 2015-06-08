@@ -1,21 +1,31 @@
-/*!
- * Facebook React Starter Kit | https://github.com/kriasoft/react-starter-kit
- * Copyright (c) KriaSoft, LLC. All rights reserved. See LICENSE.txt
+/*
+ * React.js Starter Kit
+ * Copyright (c) Konstantin Tarkus (@koistya), KriaSoft LLC
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE.txt file in the root directory of this source tree.
  */
 
-'use strict';
+import webpack, { DefinePlugin, BannerPlugin } from 'webpack';
+import merge from 'lodash/object/merge';
+import autoprefixer from 'autoprefixer-core';
+import minimist from 'minimist';
 
-var _ = require('lodash');
-var webpack = require('webpack');
-var argv = require('minimist')(process.argv.slice(2));
-
-var DEBUG = !argv.release;
-
-var AUTOPREFIXER_LOADER = 'autoprefixer-loader?{browsers:[' +
-  '"Android 2.3", "Android >= 4", "Chrome >= 20", "Firefox >= 24", ' +
-  '"Explorer >= 8", "iOS >= 6", "Opera >= 12", "Safari >= 6"]}';
-
-var GLOBALS = {
+const argv = minimist(process.argv.slice(2));
+const DEBUG = !argv.release;
+const STYLE_LOADER = 'style-loader/useable';
+const CSS_LOADER = DEBUG ? 'css-loader' : 'css-loader?minimize';
+const AUTOPREFIXER_BROWSERS = [
+  'Android 2.3',
+  'Android >= 4',
+  'Chrome >= 20',
+  'Firefox >= 24',
+  'Explorer >= 8',
+  'iOS >= 6',
+  'Opera >= 12',
+  'Safari >= 6'
+];
+const GLOBALS = {
   'process.env.NODE_ENV': DEBUG ? '"development"' : '"production"',
   '__DEV__': DEBUG
 };
@@ -25,7 +35,7 @@ var GLOBALS = {
 // client-side (app.js) and server-side (server.js) bundles
 // -----------------------------------------------------------------------------
 
-var config = {
+const config = {
   output: {
     path: './build/',
     publicPath: './',
@@ -34,7 +44,6 @@ var config = {
 
   cache: DEBUG,
   debug: DEBUG,
-  devtool: DEBUG ? '#inline-source-map' : false,
 
   stats: {
     colors: true,
@@ -61,12 +70,11 @@ var config = {
     loaders: [
       {
         test: /\.css$/,
-        loader: 'style-loader!css-loader!' + AUTOPREFIXER_LOADER
+        loader: STYLE_LOADER + '!' + CSS_LOADER + '!postcss-loader'
       },
       {
         test: /\.less$/,
-        loader: 'style-loader!css-loader!' + AUTOPREFIXER_LOADER +
-                '!less-loader'
+        loader: STYLE_LOADER + '!' + CSS_LOADER + '!postcss-loader!less-loader'
       },
       {
         test: /\.gif/,
@@ -90,20 +98,23 @@ var config = {
         loader: 'babel-loader'
       }
     ]
-  }
+  },
+
+  postcss: [autoprefixer(AUTOPREFIXER_BROWSERS)]
 };
 
 //
 // Configuration for the client-side bundle (app.js)
 // -----------------------------------------------------------------------------
 
-var appConfig = _.merge({}, config, {
+const appConfig = merge({}, config, {
   entry: './src/app.js',
   output: {
     filename: 'app.js'
   },
+  devtool: DEBUG ? 'source-map' : false,
   plugins: config.plugins.concat([
-      new webpack.DefinePlugin(_.merge(GLOBALS, {'__SERVER__': false}))
+      new DefinePlugin(merge(GLOBALS, {'__SERVER__': false}))
     ].concat(DEBUG ? [] : [
       new webpack.optimize.DedupePlugin(),
       new webpack.optimize.UglifyJsPlugin(),
@@ -116,7 +127,7 @@ var appConfig = _.merge({}, config, {
 // Configuration for the server-side bundle (server.js)
 // -----------------------------------------------------------------------------
 
-var serverConfig = _.merge({}, config, {
+const serverConfig = merge({}, config, {
   entry: './src/server.js',
   output: {
     filename: 'server.js',
@@ -132,17 +143,20 @@ var serverConfig = _.merge({}, config, {
     __filename: false,
     __dirname: false
   },
+  devtool: DEBUG ? 'source-map' : 'cheap-module-source-map',
   plugins: config.plugins.concat(
-    new webpack.DefinePlugin(_.merge(GLOBALS, {'__SERVER__': true}))
+    new DefinePlugin(merge(GLOBALS, {'__SERVER__': true})),
+    new BannerPlugin('require("source-map-support").install();',
+      { raw: true, entryOnly: false })
   ),
   module: {
     loaders: config.module.loaders.map(function(loader) {
       // Remove style-loader
-      return _.merge(loader, {
-        loader: loader.loader = loader.loader.replace('style-loader!', '')
+      return merge(loader, {
+        loader: loader.loader = loader.loader.replace(STYLE_LOADER + '!', '')
       });
     })
   }
 });
 
-module.exports = [appConfig, serverConfig];
+export default [appConfig, serverConfig];
